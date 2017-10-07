@@ -1,0 +1,23 @@
+{
+  "name": "attest-chain",
+  "version": "1.0.0",
+  "description": "",
+  "preferGlobal": true,
+  "bin": "./command.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sunnya97/attest-chain.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sunnya97/attest-chain/issues"
+  },
+  "homepage": "https://github.com/sunnya97/attest-chain#readme",
+  "dependencies": {
+    "commander": "^2.11.0",
+    "ethereumjs-util": "^5.1.2",
+    "mongoose": "^4.12.0",
+    "web3": "^1.0.0-beta.22"
+  }
+}
