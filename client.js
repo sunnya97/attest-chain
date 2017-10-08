@@ -25,43 +25,51 @@ Specification
 
 
 //When signing message is sent:
+//Data = array of signed objects
 const signing_handler = (data, private_key, revocable, signer) => {
 	let parsed_data = JSON.parse(data);
 	if(signer == 'requester') 
 	{
-		const sig = sign_attestation(parsed_data, private_key);
-		parsed_data['requester_signature'] = sig;
-		return data;
+		for(let i = 0; i < data.length; i++) 
+		{
+			parsed_data[i]['requester_signature'] = sign_attestation(parsed_data[i], private_key);
+		}
 	}
 	else if (signer == 'attestor') 
 	{
-		if(revocable) 
+		//sign all the messages
+		for(let i = 0; i < data.length; i++) 
 		{
-			for(let i = 0; )
-
+			parsed_data[i]['attestor_signature'] = sign_attestation(parsed_data[i], private_key);
 		}
-
+		if(!revocable)
+		{
+			proofs = get_merkle_proofs(parsed_data);
+			for(let i = 0; i < data.length; i++) 
+			{
+				if(parsed_data[i]['data']['isRevocable']) 
+					throw("All entries must be irrevocable")
+				parsed_data[i]['merkle_proof'] = proofs[i];
+			}
+		}
 	}
 	else 
 	{
 		throw("Signer must be a requester or attestor");
 	}
-
+	return parsed_data;
 }
 
 
 const sign_attestation = (data, private_key) => {
-	const sig = web3.eth.accounts.sign(data, private_key);
+	let message = stringify(data);
+	const sig = web3.eth.accounts.sign(message, private_key);
 	const pub = ethJsUtil.bufferToHex(ethJsUtil.privateToPublic(private_key))
 
 	//Deal with merkle proofing
 	console.log(sig);
 	console.log(pub);
 };
-
-const string_to_array_then_proof = (data) => {
-	get_merkle_proofs(JSON.parse(data))
-}
 
 const get_merkle_proofs = (data) => {
 	const length = data.length;
@@ -81,7 +89,7 @@ const get_merkle_proofs = (data) => {
 	console.log(leaves);
 
 	//Generate merkle trees
-	var tree = merkle('sha3').sync(leaves);
+	var tree = merkle('sha256').sync(leaves);
 	/*
 	for(var i = 0; i < length; i++) {
 		//TODO: verify validity of irrevocability
@@ -92,50 +100,72 @@ const get_merkle_proofs = (data) => {
 
 	//TODO: Send tree.root() to smart contract
 
-	var proofs = {};
+	var proofs = [];
 	//Return a list of merkle proofs
 	for(var i = 0; i < length; i++)
 	{
-		proofs[data[i]] = tree.getProofPath(i); 
+		proofs.push(tree.getProofPath(i)); 
 	}
 
 	return proofs;
 };
 
-const verify_attestation = (signed_attestation, attestor_pubkey) => {
-	//Verify the signer is the desired attestor
+const verify_handler = (signed_attestation, attestor_pubkey) => {
+	return verify_attestation(JSON.parse(signed_attestation), attestor_pubkey, requester_pubkey);
+}
+
+const verify_signature = (data, sig, pubkey) => {
+	const data_hash = web3.eth.accounts.hashMessage(data);
+	recovered_addr = web3.eth.accounts.recover(data_hash, sig).toLowerCase();
+	check_addr = ethJsUtil.bufferToHex(ethJsUtil.pubToAddress(pubkey)).toLowerCase();
+	return recovered_addr == check_addr;
+}
+
+const verify_attestation = (signed_attestation, attestor_pubkey, requester_pubkey) => {
+	//Verify signers
 	const attestation_data = signed_attestation['data'];
-	const attestation_sig = signed_attestation['signature'];
-	const data_hash = web3.eth.accounts.hashMessage(attestation_data);
-	recovered_addr = web3.eth.accounts.recover(data_hash, attestation_sig).toLowerCase();
-	attestor_addr = ethJsUtil.bufferToHex(ethJsUtil.pubToAddress(attestor_pubkey)).toLowerCase();
-	console.log(recovered_addr == attestor_addr);
+	if(!verify_signature(attestation_data, signed_attestation['attestor_signature'], attestor_pubkey))
+		return false;
+	if(!verify_signature(attestation_data, signed_attestation['requester_signature'], requester_pubkey))
+		return false;
 
 	//Get the list of compromised signatures
-	web3.eth.contract.methods.checkIfCompromised(recovered_addr).call()
-	//If verifier signature is compromised
-			//If irrevocable:
+	web3.eth.getStorageAt(/*address for list of compromised pubkeys*/, /*position*/, function(error, result) {
+		if(error) 
+			throw(error);
+		//Examine list in result to see if attestor_pubkey is there
+		if(/* attestor_pubkey compromised */) {
+			if(!signed_attestation['data']['isRevocable']) {
 				var merkle_proof = signed_attestation['merkle-proof'];
-
-				//Use merkle proof to generate root hash
-				//Search smart contract storage to find root hash. If present, TRUE
-			//If revocable: 
-				//FALSE
-	//If hash of signed_attestation appears in contract storage
-		//If hash is validly signed, and attestation is revocable, then FALSE
-		//TRUE
-
-	//TRUE 
+				var claimed_merkle_root = generate_merkle_root_from_proof(merkle_proof, attestation_data);
+				var root_hash = //get root hash from chain
+				if(root_hash == claimed_merkle_root) 
+					return true;
+			}
+			return false;
+		}
+		//Examine list of revoked things on chain, see if hash of signed_attestation appears
+		if(/* hash appears on chain */)
+		{
+			if(verify_signature(/*on revoked list*/) && signed_attestation['data']['isRevocable'])
+				return false;
+		}
+		return true;
+	})
+	
+	return true;
 };
 
 const revoke_attestation = (signed_attestation, private_key) => {
+	let hash = signed_attestation['data']
 	//Hash signed_attestation
 	//Sign message
 	//Publish hash + signed hash to smart contract
 };
 
-const claim_compromised = (comp_priv_key, new_pub_key) => {
+const claim_compromised = (comp_priv_key, comp_pub_key, new_pub_key) => {
 	//Publish pair to smart contract storage
 };
  
-module.exports = { sign_attestation, verify_attestation, revoke_attestation, claim_compromised, get_merkle_proofs, string_to_array_then_proof };
+module.exports = { sign_attestation, verify_attestation, revoke_attestation, 
+	claim_compromised, get_merkle_proofs, string_to_array_then_proof };
