@@ -1,31 +1,56 @@
-const mongoose = require('mongoose')
 const assert = require('assert')
 const Web3 = require('web3')
 const ethJsUtil = require('ethereumjs-util')
+const merkle = require('merkle')
+const stringify = require('json-stringify-deterministic')
 
-mongoose.Promise = global.Promise;
 var web3 = new Web3(Web3.givenProvider || "ws://localhost:8546");
 
-//const db = mongoose.connect('mongodb://localhost:27017/attest-chain');
+/*
+Specification
+	const signedSchema = mongoose.Schema({
+		data: { type: String },
+		attestor_signature: { type: String },
+		merkle_proof: { type: String }
+		requester_signature: { type: String }
+	});
 
-//Addl tasks:
-	//Peer to peer messaging (request attestation, send attestation)
-	//Store things in Mongo -- 
+	const dataSchema = mongoose.Schema({
+		message: { type: String },
+		timestamp: { type: Number },
+		expiration: { type: Number },
+		isRevocable: { type: Boolean }
+	});
+*/
 
 
-const signedSchema = mongoose.Schema({
-	data: { type: String },
-	signature: { type: String },
-	merkle_proof: { type: String }
-});
+//When signing message is sent:
+const signing_handler = (data, private_key, revocable, signer) => {
+	let parsed_data = JSON.parse(data);
+	if(signer == 'requester') 
+	{
+		const sig = sign_attestation(parsed_data, private_key);
+		parsed_data['requester_signature'] = sig;
+		return data;
+	}
+	else if (signer == 'attestor') 
+	{
+		if(revocable) 
+		{
+			for(let i = 0; )
 
-const dataSchema = mongoose.Schema({
-	message: { type: String },
-	expiration: { type: Number },
-	isRevocable: { type: Boolean }
-});
+		}
 
-const sign_attestation = ({data, private_key}) => {
+	}
+	else 
+	{
+		throw("Signer must be a requester or attestor");
+	}
+
+}
+
+
+const sign_attestation = (data, private_key) => {
 	const sig = web3.eth.accounts.sign(data, private_key);
 	const pub = ethJsUtil.bufferToHex(ethJsUtil.privateToPublic(private_key))
 
@@ -34,11 +59,50 @@ const sign_attestation = ({data, private_key}) => {
 	console.log(pub);
 };
 
-const get_merkle_proofs = ({}) => {
-	
+const string_to_array_then_proof = (data) => {
+	get_merkle_proofs(JSON.parse(data))
+}
+
+const get_merkle_proofs = (data) => {
+	const length = data.length;
+	var leaves = [];
+
+	for(var i = 0; i < length; i++) {
+		//TODO: verify validity of irrevocability
+		leaves.push(web3.utils.sha3(data[i]));
+	}
+
+	for(var i = length; i < Math.pow(2, Math.ceil(Math.log2(length))); i++) {
+		var rand_seed = Math.random();
+		console.log(rand_seed);
+		leaves.push(web3.utils.sha3(rand_seed.toString()));
+	}
+
+	console.log(leaves);
+
+	//Generate merkle trees
+	var tree = merkle('sha3').sync(leaves);
+	/*
+	for(var i = 0; i < length; i++) {
+		//TODO: verify validity of irrevocability
+		console.log(web3.utils.sha3(leaves[i]));
+	}
+	*/
+	console.log(tree.level(tree.levels()-1))
+
+	//TODO: Send tree.root() to smart contract
+
+	var proofs = {};
+	//Return a list of merkle proofs
+	for(var i = 0; i < length; i++)
+	{
+		proofs[data[i]] = tree.getProofPath(i); 
+	}
+
+	return proofs;
 };
 
-const verify_attestation = ( {signed_attestation, attestor_pubkey} ) => {
+const verify_attestation = (signed_attestation, attestor_pubkey) => {
 	//Verify the signer is the desired attestor
 	const attestation_data = signed_attestation['data'];
 	const attestation_sig = signed_attestation['signature'];
@@ -47,8 +111,12 @@ const verify_attestation = ( {signed_attestation, attestor_pubkey} ) => {
 	attestor_addr = ethJsUtil.bufferToHex(ethJsUtil.pubToAddress(attestor_pubkey)).toLowerCase();
 	console.log(recovered_addr == attestor_addr);
 
+	//Get the list of compromised signatures
+	web3.eth.contract.methods.checkIfCompromised(recovered_addr).call()
 	//If verifier signature is compromised
 			//If irrevocable:
+				var merkle_proof = signed_attestation['merkle-proof'];
+
 				//Use merkle proof to generate root hash
 				//Search smart contract storage to find root hash. If present, TRUE
 			//If revocable: 
@@ -60,14 +128,14 @@ const verify_attestation = ( {signed_attestation, attestor_pubkey} ) => {
 	//TRUE 
 };
 
-const revoke_attestation = ( {signed_attestation, private_key} ) => {
+const revoke_attestation = (signed_attestation, private_key) => {
 	//Hash signed_attestation
 	//Sign message
 	//Publish hash + signed hash to smart contract
 };
 
-const claim_compromised = ( {comp_priv_key, new_priv_key} ) => {
+const claim_compromised = (comp_priv_key, new_pub_key) => {
 	//Publish pair to smart contract storage
 };
  
-module.exports = { sign_attestation, verify_attestation, revoke_attestation, claim_compromised };
+module.exports = { sign_attestation, verify_attestation, revoke_attestation, claim_compromised, get_merkle_proofs, string_to_array_then_proof };
