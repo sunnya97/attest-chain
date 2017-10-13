@@ -214,7 +214,7 @@ const verify_attestation = (signed_attestation, attestor_pubkey, requester_pubke
 };
 
 const revoke_attestation = (signed_attestation, private_key) => {
-	let hash = signed_attestation['data']
+	let hash = signed_attestation['data'];
 	//Hash signed_attestation
 	//Sign message
 	//Publish hash + signed hash to smart contract
