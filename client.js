@@ -3,10 +3,11 @@ const Web3 = require('web3')
 const ethJsUtil = require('ethereumjs-util')
 const merkle = require('merkle')
 const stringify = require('json-stringify-deterministic')
-	
-var web3 = new Web3("http://localhost:8545"); 
+const contractAbi = require('./abi.json')
 
-const attestchainContract = new web3.eth.Contract([{"constant":true,"inputs":[{"name":"","type":"uint256"}],"name":"compromisations","outputs":[{"name":"comp_priv_key","type":"bytes32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"get_merkleroots_list","outputs":[{"name":"","type":"bytes32[]"},{"name":"","type":"bytes1[130][]"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"","type":"uint256"}],"name":"merkleroots","outputs":[{"name":"merkle_root","type":"bytes32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"get_revocation_list","outputs":[{"name":"","type":"bytes32[]"},{"name":"","type":"bytes1[130][]"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"comp_priv_key","type":"bytes32"},{"name":"new_pub_key","type":"bytes1[64]"}],"name":"compromise","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"root","type":"bytes32"},{"name":"signature","type":"bytes1[130]"}],"name":"submit_root","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"get_compromisation_list","outputs":[{"name":"","type":"bytes32[]"},{"name":"","type":"bytes1[64][]"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"hash","type":"bytes32"},{"name":"signature","type":"bytes1[130]"}],"name":"revoke","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"","type":"uint256"}],"name":"revocations","outputs":[{"name":"hash","type":"bytes32"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[],"payable":false,"stateMutability":"nonpayable","type":"constructor"}], "0xdd73bcaf6cd68884edf2be65afe0bc7241dc9fbb");
+var web3 = new Web3("http://localhost:8545");
+
+const attestchainContract = new web3.eth.Contract(contractAbi, "0xdd73bcaf6cd68884edf2be65afe0bc7241dc9fbb");
 
 /*
 Specification
@@ -30,32 +31,32 @@ Specification
 //Data = array of signed objects
 const signing_handler = (data, private_key, revocable, signer) => {
 	let parsed_data = JSON.parse(data);
-	if(signer == 'requester') 
+	if(signer == 'requester')
 	{
-		for(let i = 0; i < parsed_data.length; i++) 
+		for(let i = 0; i < parsed_data.length; i++)
 		{
 			parsed_data[i]['requester_signature'] = sign_attestation(parsed_data[i]['data'], private_key);
 		}
 	}
-	else if (signer == 'attestor') 
+	else if (signer == 'attestor')
 	{
 		//sign all the messages
-		for(let i = 0; i < parsed_data.length; i++) 
+		for(let i = 0; i < parsed_data.length; i++)
 		{
 			parsed_data[i]['attestor_signature'] = sign_attestation(parsed_data[i]['data'], private_key);
 		}
 		if(!revocable)
 		{
 			proofs = get_merkle_proofs(parsed_data);
-			for(let i = 0; i < parsed_data.length; i++) 
+			for(let i = 0; i < parsed_data.length; i++)
 			{
-				if(parsed_data[i]['data']['isRevocable']) 
+				if(parsed_data[i]['data']['isRevocable'])
 					throw("All entries must be irrevocable")
 				parsed_data[i]['merkle_proof'] = proofs[i];
 			}
 		}
 	}
-	else 
+	else
 	{
 		throw("Signer must be a requester or attestor");
 	}
@@ -99,12 +100,12 @@ const get_merkle_proofs = (data) => {
 
 	//Generate merkle trees
 	var tree = merkle('sha256').sync(leaves);
-	
+
 	for(var i = 0; i < length; i++) {
 		//TODO: verify validity of irrevocability
 		//console.log(web3.utils.sha3(leaves[i]));
 	}
-	
+
 	console.log(tree.level(tree.levels()-1))
 
 	//TODO: Send tree.root() to smart contract
@@ -113,7 +114,7 @@ const get_merkle_proofs = (data) => {
 	//Return a list of merkle proofs
 	for(var i = 0; i < length; i++)
 	{
-		proofs.push(tree.getProofPath(i)); 
+		proofs.push(tree.getProofPath(i));
 	}
 
 	return proofs;
@@ -147,7 +148,7 @@ const verify_attestation = (signed_attestation, attestor_pubkey, requester_pubke
 		callback("attestor signature invalid");
 		return false;
 	}
-	if(!verify_signature(attestation_data, signed_attestation['requester_signature'], requester_pubkey)) {	
+	if(!verify_signature(attestation_data, signed_attestation['requester_signature'], requester_pubkey)) {
 		callback("requester signature invalid");
 		return false;
 	}
@@ -157,11 +158,14 @@ const verify_attestation = (signed_attestation, attestor_pubkey, requester_pubke
 	//Get the list of compromised signatures
 	attestchainContract.methods.get_compromisation_list().call(function(error, response) {
 		if(error)
+		{
+			console.log(error)
 			throw(error);
+		}
 		var compromised_privkeys = response['0'];
 		for(let i = 0; i < compromised_privkeys.length; i++) {
 			var comp_pubkey = ethJsUtil.bufferToHex(ethJsUtil.privateToPublic(compromised_privkeys[i])).toLowerCase();
-			
+
 			//Attestor pubkey compromised!!!!!
 			if(comp_pub_key == attestor_pubkey.toLowerCase()) {
 				console.log("compromised");
@@ -223,5 +227,5 @@ const revoke_attestation = (signed_attestation, private_key) => {
 const claim_compromised = (comp_priv_key, comp_pub_key, new_pub_key) => {
 	//Publish pair to smart contract storage
 };
- 
+
 module.exports = { signing_handler, verify_handler };

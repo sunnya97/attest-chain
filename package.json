@@ -4,6 +4,11 @@
   "description": "",
   "preferGlobal": true,
   "bin": "./command.js",
+  "scripts": {
+    "build": "make",
+    "createLocalTestChain": "make local-test-chain",
+    "start": "startServer.sh"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sunnya97/attest-chain.git"
