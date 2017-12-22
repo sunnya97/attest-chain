@@ -2,3 +2,4 @@ node_modules/
 localTestNet/localNetDataDir/geth/
 localTestNet/localNetDataDir/history
 localTestNet/localNetDataDir/keystore/
+abi.json
