@@ -7,7 +7,7 @@
   "scripts": {
     "build": "make",
     "createLocalTestChain": "make local-test-chain",
-    "start": "startServer.sh"
+    "start": "./startServer.sh"
   },
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
     "ethereumjs-util": "^5.1.2",
     "json-stringify-deterministic": "^1.0.1",
     "merkle": "^0.6.0",
-    "mongoose": "^4.12.0",
+    "merkle-tools": "^1.4.0",
     "web3": "^1.0.0-beta.22"
   }
 }
