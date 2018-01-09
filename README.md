@@ -15,6 +15,9 @@ If you'd like to avoid buying/mining ethereum you can create a local test
 blockchain with either `make local-test-chain` or
 `npm run-script createLocalTestChain` otherwise you can choose to configure things yourself to use the slow, expensive blockchain.
 
+Additionally, depending on whether your command line responds to solc or solcjs (from an npm install), modify the Makefile.
+You should 'make clean' and then 'make abi.json' before running your code. 
+
 ## Running
 To start the server you can either execute `startServer.sh` or `npm start`, and after that you should have a real live server running in console mode for your development pleasure.
 

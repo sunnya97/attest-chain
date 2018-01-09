@@ -14,8 +14,7 @@ const attestchainContract = new web3.eth.Contract(contractAbi, "0xdd73bcaf6cd688
 var merkleTools = new MerkleTools({hashType: 'SHA3-256'});
 
 /*
-Specification
-	const signedSchema = {
+    const signedSchema = {
 		data: { type: String },
 		pubkey: { type: String },
 		signature: { type: String },
@@ -44,7 +43,7 @@ const signing_handler = (data_list, private_key) => {
 
 		signed_attestations.push(sign_attestation(data_list[i], private_key));
 
-		if(!JSON.parse(data_list[i]['isRevocable']) {
+		if(!JSON.parse(data_list[i]['isRevocable'])) {
 			irrevocable_attestations.push(signed_attestations[i]);
 		}
 	}
@@ -75,8 +74,8 @@ const add_merkle_proofs = (irrevocable_attestations) => {
 		return [];
 	}
 
-	for(var i = 0; irrevocable_attestations < length; i++) {
-		merkleTools.addLeaf(data_list[i] + signature, true);
+	for(var i = 0; i < length; i++) {
+		merkleTools.addLeaf(irrevocable_attestations[i]['data'] + irrevocable_attestations[i]['signature'], true);
 	}
 
 	merkleTools.makeTree();
@@ -86,8 +85,6 @@ const add_merkle_proofs = (irrevocable_attestations) => {
 		irrevocable_attestations[i]['merkleRoot'] = merkleroot;
 		irrevocable_attestations[i]['merkleProof'] = stringify(getProof(i));
 	}
-
-	return [merkleroot, irrevocable_attestations];
 }
 
 
@@ -104,8 +101,8 @@ const verify_signature = (data, sig, pubkey) => {
 
 const verify_attestation = (signed_attestation, check_pubkey, callback) => {
 	//Verify signers
-	let attestation = JSON.parse{sign_attestation};
-	let data = JSON.parse(attestation['data']);
+	let attestation = JSON.parse(signed_attestation);
+	let data = attestation['data'];
 
 	if(attestation['algorithm'] != 'secp256k1') {
 		throw("algorithm currently not supported")
@@ -140,7 +137,7 @@ const verify_attestation = (signed_attestation, check_pubkey, callback) => {
 				console.log("compromised");
 				if(!signed_attestation['data']['isRevocable']) {
 					var merkle_proof = signed_attestation['merkle-proof'];
-					var claimed_merkle_root = generate_merkle_root_from_proof(merkle_proof, attestation_data);
+					var claimed_merkle_root = generate_merkle_root_from_proof(merkle_proof, attestation['data']);
 					attestchainContract.methods.get_merkleroots_list().call(function(error, response) {
 						if(error)
 							throw(error);
